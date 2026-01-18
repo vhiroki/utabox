@@ -87,6 +87,20 @@ Local CSV Files (in video folder)     YouTube CSVs (from GitHub)
 3. Run `./build-apk.sh` to build APK
 4. Test with `./build-apk.sh --install` if device connected
 
+## Building APKs
+
+**Always use `./build-apk.sh`** to build APKs. Do not use `./gradlew assembleDebug` directly.
+
+```bash
+./build-apk.sh              # Build debug APK
+./build-apk.sh --clean      # Clean and build debug APK  
+./build-apk.sh --install    # Build and install on connected device
+./build-apk.sh -c -i        # Clean build and install
+./build-apk.sh --release    # Build release APK (requires signing config)
+```
+
+The script handles all build configuration and outputs the APK location when complete.
+
 ## Troubleshooting
 
 ```bash
