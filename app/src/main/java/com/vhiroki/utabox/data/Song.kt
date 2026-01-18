@@ -5,7 +5,8 @@ data class Song(
     val filename: String,
     val artist: String,
     val title: String,
-    val youtubeUrl: String? = null
+    val youtubeUrl: String? = null,
+    val notes: String? = null
 ) {
     val isYouTube: Boolean get() = youtubeUrl != null
 }

@@ -240,6 +240,16 @@ private fun SongCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (!song.notes.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = song.notes,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             // YouTube indicator on the right

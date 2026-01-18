@@ -144,7 +144,7 @@ class YouTubeSongLoader {
 
     /**
      * Parse CSV content and add songs to the map.
-     * CSV format: code,title,artist,url
+     * CSV format: code,artist,title,url,notes
      * Duplicate codes are overwritten (last occurrence wins).
      */
     private fun parseCsv(content: String, songsMap: MutableMap<String, Song>) {
@@ -164,7 +164,7 @@ class YouTubeSongLoader {
 
     /**
      * Parse a single CSV line into a Song.
-     * Expected format: code,title,artist,url
+     * Expected format: code,artist,title,url,notes
      * Handles quoted fields (e.g., titles with commas)
      */
     private fun parseCsvLine(line: String): Song? {
@@ -172,9 +172,10 @@ class YouTubeSongLoader {
         if (parts.size < 4) return null
 
         val code = parts[0].trim()
-        val title = parts[1].trim()
-        val artist = parts[2].trim()
+        val artist = parts[1].trim()
+        val title = parts[2].trim()
         val url = parts[3].trim()
+        val notes = if (parts.size > 4) parts[4].trim().takeIf { it.isNotEmpty() } else null
 
         if (code.isBlank() || url.isBlank()) return null
 
@@ -183,7 +184,8 @@ class YouTubeSongLoader {
             filename = "", // No local file for YouTube songs
             artist = artist,
             title = title,
-            youtubeUrl = url
+            youtubeUrl = url,
+            notes = notes
         )
     }
 
