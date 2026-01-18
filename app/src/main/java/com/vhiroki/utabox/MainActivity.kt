@@ -27,13 +27,19 @@ class MainActivity : ComponentActivity() {
     // Track permission state to trigger recomposition
     private val permissionGranted = mutableStateOf(false)
 
+    // Callback to invoke after folder is selected
+    private var onFolderSelectedCallback: (() -> Unit)? = null
+
     private val folderPickerLauncher = registerForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
         uri?.let {
+            android.util.Log.d("MainActivity", "Selected folder: $it")
             videoStorageHelper.savePersistedFolderUri(it)
             // Trigger recomposition to update video source description
             permissionGranted.value = !permissionGranted.value
+            // Call the callback to reload songs
+            onFolderSelectedCallback?.invoke()
         }
     }
 
@@ -66,7 +72,8 @@ val navController = rememberNavController()
 
                     UtaBoxNavHost(
                         navController = navController,
-                        onRequestFolderPicker = {
+                        onRequestFolderPicker = { onFolderSelected ->
+                            onFolderSelectedCallback = onFolderSelected
                             folderPickerLauncher.launch(null)
                         }
                     )

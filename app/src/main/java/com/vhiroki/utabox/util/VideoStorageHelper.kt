@@ -52,7 +52,7 @@ class VideoStorageHelper(private val context: Context) {
      * Check if any video source is available
      */
     fun hasVideoSource(): Boolean {
-        return isTestFolderAvailable() || isUsbStorageAvailable() || hasPersistedFolder()
+        return hasPersistedFolder() || isTestFolderAvailable() || isUsbStorageAvailable()
     }
 
     /**
@@ -60,9 +60,13 @@ class VideoStorageHelper(private val context: Context) {
      */
     fun getVideoSourceDescription(): String {
         return when {
+            hasPersistedFolder() -> {
+                val uri = getPersistedUri()
+                val path = uri?.path?.substringAfter("primary:")?.replace("/", "/") ?: uri.toString()
+                "Folder: $path"
+            }
             isTestFolderAvailable() -> "Test folder: ${getTestFolder()?.absolutePath}"
             isUsbStorageAvailable() -> "USB: ${getUsbVideoFolder()?.absolutePath ?: "Removable storage"}"
-            hasPersistedFolder() -> "Selected folder"
             else -> "No video source configured"
         }
     }
@@ -95,6 +99,24 @@ class VideoStorageHelper(private val context: Context) {
 
     fun hasPersistedFolder(): Boolean {
         return getPersistedUri() != null
+    }
+
+    /**
+     * Get the video source directory as a File (for test folder or USB).
+     * Returns null if only SAF/persisted folder is available.
+     */
+    fun getVideoSourceDirectory(): File? {
+        getTestFolder()?.let { if (isTestFolderAvailable()) return it }
+        getUsbVideoFolder()?.let { return it }
+        return null
+    }
+
+    /**
+     * Get the persisted folder URI (for SAF access).
+     * Returns null if no folder is persisted.
+     */
+    fun getPersistedTreeUri(): Uri? {
+        return getPersistedUri()
     }
 
     // ===== Private methods =====

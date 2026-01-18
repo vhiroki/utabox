@@ -8,7 +8,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,13 +28,27 @@ import com.vhiroki.utabox.data.Song
 fun SongListScreen(
     viewModel: SongListViewModel,
     onSongClick: (Song) -> Unit,
+    onSelectFolder: () -> Unit,
     videoSourceDescription: String,
     modifier: Modifier = Modifier
 ) {
     val songs by viewModel.songs.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
     val focusManager = LocalFocusManager.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Show error in snackbar
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            snackbarHostState.showSnackbar(
+                message = it,
+                duration = SnackbarDuration.Long
+            )
+            viewModel.clearError()
+        }
+    }
 
     // State for numpad input
     var numpadInput by remember { mutableStateOf("") }
@@ -44,9 +60,26 @@ fun SongListScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
+                ),
+                actions = {
+                    IconButton(onClick = onSelectFolder) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Select folder",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    IconButton(onClick = { viewModel.reload() }) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Reload songs",
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         modifier = modifier
     ) { paddingValues ->
         Row(
@@ -120,7 +153,7 @@ fun SongListScreen(
                     ) {
                         items(
                             items = songs,
-                            key = { it.musicId }
+                            key = { it.code }
                         ) { song ->
                             SongCard(
                                 song = song,
@@ -137,7 +170,7 @@ fun SongListScreen(
                 onInputChange = { numpadInput = it },
                 onEnterClick = {
                     // Find song by ID and trigger click
-                    val song = songs.find { it.musicId == numpadInput }
+                    val song = songs.find { it.code == numpadInput }
                     if (song != null) {
                         onSongClick(song)
                     } else {
@@ -178,7 +211,7 @@ private fun SongCard(
                 shape = MaterialTheme.shapes.small
             ) {
                 Text(
-                    text = song.musicId,
+                    text = song.code,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -191,7 +224,7 @@ private fun SongCard(
             // Song info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = song.musica,
+                    text = song.title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -199,7 +232,7 @@ private fun SongCard(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = song.artista,
+                    text = song.artist,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

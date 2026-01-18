@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.vhiroki.utabox.data.Song
 import com.vhiroki.utabox.data.SongRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -19,6 +20,9 @@ class SongListViewModel(private val repository: SongRepository) : ViewModel() {
     private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
     val songs: StateFlow<List<Song>> = _searchQuery
         .debounce(300) // Wait for user to stop typing
         .flatMapLatest { query ->
@@ -31,12 +35,30 @@ class SongListViewModel(private val repository: SongRepository) : ViewModel() {
             initialValue = emptyList()
         )
 
+    init {
+        reload()
+    }
+
     fun onSearchQueryChanged(query: String) {
         _searchQuery.value = query
     }
 
     fun clearSearch() {
         _searchQuery.value = ""
+    }
+
+    fun reload() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _isLoading.value = true
+            _errorMessage.value = null
+            val error = repository.reload()
+            _errorMessage.value = error
+            _isLoading.value = false
+        }
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
     }
 
     class Factory(private val repository: SongRepository) : ViewModelProvider.Factory {

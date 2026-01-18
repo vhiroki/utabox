@@ -165,12 +165,12 @@ private fun SongInfoOverlay(
 
             Column {
                 Text(
-                    text = song.musica,
+                    text = song.title,
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White
                 )
                 Text(
-                    text = "${song.artista} • ${song.musicId}",
+                    text = "${song.artist} • ${song.code}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.7f)
                 )

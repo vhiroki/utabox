@@ -26,7 +26,7 @@ class PlayerViewModel(
     fun loadVideo(song: Song) {
         _uiState.value = PlayerUiState(song = song, isLoading = true)
 
-        val videoUri = videoStorageHelper.getVideoUri(song.musicId)
+        val videoUri = videoStorageHelper.getVideoUri(song.code)
 
         if (videoUri != null) {
             _uiState.value = PlayerUiState(
@@ -38,7 +38,7 @@ class PlayerViewModel(
             _uiState.value = PlayerUiState(
                 song = song,
                 isLoading = false,
-                error = "Video file not found: ${song.musicId}.mp4"
+                error = "Video file not found: ${song.code}.mp4"
             )
         }
     }
