@@ -21,8 +21,10 @@ This document provides AI-specific guidance. See [README.md](README.md) for proj
 | Song list UI | `app/src/main/java/com/vhiroki/utabox/ui/songlist/SongListScreen.kt` |
 | Video player | `app/src/main/java/com/vhiroki/utabox/ui/player/PlayerScreen.kt` |
 | Navigation | `app/src/main/java/com/vhiroki/utabox/ui/navigation/Navigation.kt` |
-| Song entity | `app/src/main/java/com/vhiroki/utabox/data/Song.kt` |
-| DAO queries | `app/src/main/java/com/vhiroki/utabox/data/SongDao.kt` |
+| Song data class | `app/src/main/java/com/vhiroki/utabox/data/Song.kt` |
+| CSV parser | `app/src/main/java/com/vhiroki/utabox/data/CsvSongReader.kt` |
+| Repository | `app/src/main/java/com/vhiroki/utabox/data/SongRepository.kt` |
+| Storage helper | `app/src/main/java/com/vhiroki/utabox/util/VideoStorageHelper.kt` |
 | Dependencies | `app/build.gradle.kts`, `gradle/libs.versions.toml` |
 
 ## Common Tasks
@@ -31,14 +33,28 @@ This document provides AI-specific guidance. See [README.md](README.md) for proj
 1. Create `ui/yourfeature/YourScreen.kt` and `YourViewModel.kt`
 2. Add navigation route in `ui/navigation/Navigation.kt`
 
-### Adding Database Queries
-1. Add query in `data/SongDao.kt`
-2. Expose via `data/SongRepository.kt`
-3. Use in ViewModel
+### Modifying Song Data
+1. Update `Song` data class in `data/Song.kt`
+2. Update CSV parsing in `data/CsvSongReader.kt`
+3. Update UI components that display song info
 
 ### Adding Dependencies
 1. Add version to `gradle/libs.versions.toml`
 2. Add dependency in `app/build.gradle.kts`
+
+## Data Flow
+
+```
+CSV Files (in video folder)
+    ↓
+CsvSongReader (parses CSV)
+    ↓
+SongRepository (in-memory storage, search/filter)
+    ↓
+SongListViewModel (StateFlow)
+    ↓
+SongListScreen (Compose UI)
+```
 
 ## Code Style
 

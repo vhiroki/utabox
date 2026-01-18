@@ -23,7 +23,7 @@ A Karaoke player Android app for tablets that plays video files (.mp4) from USB 
 | Language | Kotlin |
 | UI Framework | Jetpack Compose (Material 3) |
 | Video Player | Media3 ExoPlayer |
-| Database | Room |
+| Data Source | CSV files |
 | Architecture | MVVM |
 | Navigation | Navigation Compose |
 | Min SDK | API 33 (Android 13) |
@@ -34,9 +34,8 @@ A Karaoke player Android app for tablets that plays video files (.mp4) from USB 
 app/src/main/java/com/vhiroki/utabox/
 ├── MainActivity.kt
 ├── data/
-│   ├── Song.kt                 # Room entity
-│   ├── SongDao.kt              # Data Access Object
-│   ├── SongDatabase.kt         # Room database
+│   ├── Song.kt                 # Song data class
+│   ├── CsvSongReader.kt        # CSV file parser
 │   └── SongRepository.kt       # Repository pattern
 ├── ui/
 │   ├── navigation/
@@ -65,11 +64,28 @@ app/src/main/java/com/vhiroki/utabox/
 
 The app searches for video files in the following locations (in order):
 
-1. **Test folder**: `/sdcard/Download/karaoke/` (for development)
-2. **USB drive**: Auto-detects removable storage with a `videoke/` folder
-3. **User-selected folder**: Via Android's document picker
+1. **User-selected folder**: Via Android's document picker (recommended)
+2. **Test folder**: `/sdcard/Download/karaoke/` (for development)
+3. **USB drive**: Auto-detects removable storage with a `videoke/` folder
 
-Video files should be named `{music_id}.mp4` (e.g., `02017.mp4`, `05340.mp4`).
+Video files should be named `{code}.mp4` (e.g., `02017.mp4`, `05340.mp4`).
+
+### Song List (CSV)
+
+Place one or more CSV files in the same folder as your video files. The app reads all `.csv` files and combines them.
+
+**CSV Format:**
+```csv
+code,filename,artist,title,lyrics_preview
+02017,02017.mp4,Ai,STORY,Kagirareta toki no naka de
+02015,02015.mp4,Akikawa Masafumi,SEN NO KAZE NI NATTE,Watashi no ohaka no mae de
+```
+
+- `code` - Song ID (used for search and display)
+- `filename` - Video filename
+- `artist` - Artist name
+- `title` - Song title
+- `lyrics_preview` - Optional, currently not displayed
 
 ### Building
 
@@ -109,17 +125,21 @@ git clone https://github.com/yourusername/UtaBox.git
 ./gradlew installDebug
 ```
 
-### Database
+### Song Data
 
-The app comes with a pre-populated SQLite database containing ~1,550 songs.
+The app reads song information from CSV files in the video folder. No pre-populated database is needed - just place your CSV file(s) alongside the video files.
 
 ## Usage
 
-1. Copy karaoke video files to your USB drive in a `videoke/` folder
-2. Connect USB to your Android tablet (via OTG adapter if needed)
+1. Prepare your karaoke files:
+   - Video files (`.mp4`) named by song code (e.g., `02017.mp4`)
+   - CSV file(s) with song information (see format above)
+2. Copy files to USB drive or device storage
 3. Launch UtaBox and grant storage permissions
-4. Search for songs by ID, title, or artist
-5. Tap a song to play the video
+4. Tap the folder icon (⚙️) to select your video folder
+5. Search for songs by code, title, or artist
+6. Tap a song to play the video
+7. Use the refresh button (🔄) to reload after adding new files
 
 ## Permissions
 
@@ -142,4 +162,3 @@ This project is for personal use.
 
 - [Media3 ExoPlayer](https://developer.android.com/media/media3/exoplayer) for video playback
 - [Jetpack Compose](https://developer.android.com/jetpack/compose) for modern UI
-- [Room](https://developer.android.com/training/data-storage/room) for database management
