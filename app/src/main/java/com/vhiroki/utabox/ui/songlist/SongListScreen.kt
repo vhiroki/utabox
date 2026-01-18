@@ -133,7 +133,7 @@ fun SongListScreen(
 
                 // Results count
                 Text(
-                    text = "${songs.size} songs",
+                    text = if (songs.size >= 200) "${songs.size}+ songs" else "${songs.size} songs",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
