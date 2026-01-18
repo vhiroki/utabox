@@ -22,10 +22,12 @@ This document provides AI-specific guidance. See [README.md](README.md) for proj
 | Video player | `app/src/main/java/com/vhiroki/utabox/ui/player/PlayerScreen.kt` |
 | Navigation | `app/src/main/java/com/vhiroki/utabox/ui/navigation/Navigation.kt` |
 | Song data class | `app/src/main/java/com/vhiroki/utabox/data/Song.kt` |
-| CSV parser | `app/src/main/java/com/vhiroki/utabox/data/CsvSongReader.kt` |
+| Local CSV parser | `app/src/main/java/com/vhiroki/utabox/data/CsvSongReader.kt` |
+| YouTube CSV loader | `app/src/main/java/com/vhiroki/utabox/data/YouTubeSongLoader.kt` |
 | Repository | `app/src/main/java/com/vhiroki/utabox/data/SongRepository.kt` |
 | Storage helper | `app/src/main/java/com/vhiroki/utabox/util/VideoStorageHelper.kt` |
 | Dependencies | `app/build.gradle.kts`, `gradle/libs.versions.toml` |
+| YouTube songs | `youtube-songs/*.csv`, `youtube-songs/index.txt` |
 
 ## Common Tasks
 
@@ -35,8 +37,13 @@ This document provides AI-specific guidance. See [README.md](README.md) for proj
 
 ### Modifying Song Data
 1. Update `Song` data class in `data/Song.kt`
-2. Update CSV parsing in `data/CsvSongReader.kt`
+2. Update CSV parsing in `data/CsvSongReader.kt` (local) or `data/YouTubeSongLoader.kt` (YouTube)
 3. Update UI components that display song info
+
+### Adding YouTube Songs
+1. Create/edit a CSV file in `youtube-songs/` folder with format: `code,title,artist,url`
+2. Add the filename to `youtube-songs/index.txt`
+3. Push to GitHub - app loads on startup and refresh
 
 ### Adding Dependencies
 1. Add version to `gradle/libs.versions.toml`
@@ -45,16 +52,25 @@ This document provides AI-specific guidance. See [README.md](README.md) for proj
 ## Data Flow
 
 ```
-CSV Files (in video folder)
-    ↓
-CsvSongReader (parses CSV)
-    ↓
-SongRepository (in-memory storage, search/filter)
-    ↓
-SongListViewModel (StateFlow)
-    ↓
-SongListScreen (Compose UI)
+Local CSV Files (in video folder)     YouTube CSVs (from GitHub)
+           ↓                                    ↓
+     CsvSongReader                      YouTubeSongLoader
+           ↓                                    ↓
+           └──────────→ SongRepository ←────────┘
+                              ↓
+                    SongListViewModel (StateFlow)
+                              ↓
+                    SongListScreen (Compose UI)
+                              ↓
+                    PlayerScreen (ExoPlayer / YouTube)
 ```
+
+## Song Sources
+
+| Source | Data Location | Video Playback |
+|--------|--------------|----------------|
+| Local | CSV in video folder | ExoPlayer (.mp4 files) |
+| YouTube | `youtube-songs/*.csv` on GitHub | android-youtube-player |
 
 ## Code Style
 
@@ -79,5 +95,10 @@ SongListScreen (Compose UI)
 
 # Full clean rebuild
 ./build-apk.sh --clean
-```
 
+# Check YouTube loader logs
+adb logcat | grep "YouTubeSongLoader"
+
+# Check YouTube player logs
+adb logcat | grep "YouTubePlayer"
+```
