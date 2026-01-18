@@ -12,6 +12,7 @@ import androidx.navigation.navArgument
 import com.vhiroki.utabox.data.CsvSongReader
 import com.vhiroki.utabox.data.Song
 import com.vhiroki.utabox.data.SongRepository
+import com.vhiroki.utabox.data.YouTubeSongLoader
 import com.vhiroki.utabox.ui.player.PlayerScreen
 import com.vhiroki.utabox.ui.player.PlayerViewModel
 import com.vhiroki.utabox.ui.songlist.SongListScreen
@@ -23,11 +24,36 @@ import java.nio.charset.StandardCharsets
 
 object Routes {
     const val SONG_LIST = "songList"
-    const val PLAYER = "player/{code}/{artist}/{title}"
+    const val PLAYER = "player/{code}/{artist}/{title}?videoId={videoId}"
 
     fun playerRoute(song: Song): String {
         val encode = { s: String -> URLEncoder.encode(s, StandardCharsets.UTF_8.toString()) }
-        return "player/${encode(song.code)}/${encode(song.artist)}/${encode(song.title)}"
+        val baseRoute = "player/${encode(song.code)}/${encode(song.artist)}/${encode(song.title)}"
+        return if (song.youtubeUrl != null) {
+            val videoId = extractYouTubeVideoId(song.youtubeUrl)
+            "$baseRoute?videoId=${encode(videoId)}"
+        } else {
+            baseRoute
+        }
+    }
+
+    private fun extractYouTubeVideoId(url: String): String {
+        val patterns = listOf(
+            """youtube\.com/watch\?v=([^&]+)""",
+            """youtu\.be/([^?]+)""",
+            """youtube\.com/embed/([^?]+)""",
+            """youtube\.com/v/([^?]+)"""
+        )
+
+        for (pattern in patterns) {
+            val regex = Regex(pattern)
+            val match = regex.find(url)
+            if (match != null) {
+                return match.groupValues[1]
+            }
+        }
+
+        return url
     }
 }
 
@@ -41,7 +67,8 @@ fun UtaBoxNavHost(
     // Create dependencies
     val videoStorageHelper = remember { VideoStorageHelper(context) }
     val csvSongReader = remember { CsvSongReader(context) }
-    val repository = remember { SongRepository(csvSongReader, videoStorageHelper) }
+    val youTubeSongLoader = remember { YouTubeSongLoader() }
+    val repository = remember { SongRepository(csvSongReader, videoStorageHelper, youTubeSongLoader) }
 
     NavHost(
         navController = navController,
@@ -82,17 +109,30 @@ fun UtaBoxNavHost(
             arguments = listOf(
                 navArgument("code") { type = NavType.StringType },
                 navArgument("artist") { type = NavType.StringType },
-                navArgument("title") { type = NavType.StringType }
+                navArgument("title") { type = NavType.StringType },
+                navArgument("videoId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
             )
         ) { backStackEntry ->
-            val decode = { s: String? -> URLDecoder.decode(s ?: "", StandardCharsets.UTF_8.toString()) }
+            val decode = { s: String? ->
+                if (s.isNullOrEmpty()) null
+                else URLDecoder.decode(s, StandardCharsets.UTF_8.toString())
+            }
+
+            val videoId = backStackEntry.arguments?.getString("videoId")
+            android.util.Log.d("Navigation", "videoId from args: $videoId")
 
             val song = Song(
-                code = decode(backStackEntry.arguments?.getString("code")),
-                filename = "${decode(backStackEntry.arguments?.getString("code"))}.mp4",
-                artist = decode(backStackEntry.arguments?.getString("artist")),
-                title = decode(backStackEntry.arguments?.getString("title"))
+                code = decode(backStackEntry.arguments?.getString("code")) ?: "",
+                filename = "${decode(backStackEntry.arguments?.getString("code")) ?: ""}.mp4",
+                artist = decode(backStackEntry.arguments?.getString("artist")) ?: "",
+                title = decode(backStackEntry.arguments?.getString("title")) ?: "",
+                youtubeUrl = videoId
             )
+            android.util.Log.d("Navigation", "Song created with youtubeUrl: ${song.youtubeUrl}")
 
             val viewModel: PlayerViewModel = viewModel(
                 factory = PlayerViewModel.Factory(videoStorageHelper)

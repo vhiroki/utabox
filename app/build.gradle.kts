@@ -53,6 +53,8 @@ dependencies {
     // Navigation
     implementation(libs.androidx.navigation.compose)
 
+    // Android YouTube Player library
+    implementation("com.pierfrancescosoffritti.androidyoutubeplayer:core:13.0.0")
 
     // Media3 ExoPlayer
     implementation(libs.androidx.media3.exoplayer)

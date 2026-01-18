@@ -7,10 +7,15 @@ import kotlinx.coroutines.flow.map
 
 class SongRepository(
     private val csvSongReader: CsvSongReader,
-    private val videoStorageHelper: VideoStorageHelper
+    private val videoStorageHelper: VideoStorageHelper,
+    private val youTubeSongLoader: YouTubeSongLoader
 ) {
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     private val _error = MutableStateFlow<String?>(null)
+
+    // Store local and YouTube songs separately so we can merge them
+    private var localSongs: List<Song> = emptyList()
+    private var youtubeSongs: List<Song> = emptyList()
 
     val error: Flow<String?> = _error
 
@@ -38,35 +43,57 @@ class SongRepository(
     }
 
     /**
-     * Load or reload songs from CSV files in the video source directory.
-     * Priority: 1. User-selected folder (SAF), 2. Test folder/USB (direct file access)
-     * Returns error message if loading fails, null on success.
+     * Load or reload songs from both local CSV files and YouTube repository.
+     * Returns error message if both sources fail, null on success.
      */
-    fun reload(): String? {
+    suspend fun reload(): String? {
         _error.value = null
 
-        // Try persisted folder first (SAF - has full access to all file types)
-        val result = videoStorageHelper.getPersistedTreeUri()?.let { uri ->
+        var localError: String? = null
+        var youtubeError: String? = null
+
+        // Load local songs
+        val localResult = videoStorageHelper.getPersistedTreeUri()?.let { uri ->
             csvSongReader.readFromDocumentFolder(uri)
         } ?: videoStorageHelper.getVideoSourceDirectory()?.let { directory ->
-            // Fall back to direct file access (limited on Android 11+)
             csvSongReader.readFromDirectory(directory)
-        } ?: Result.failure(Exception("No video source configured"))
+        }
 
-        return result.fold(
-            onSuccess = { songs ->
-                _songs.value = songs.sortedWith(
-                    compareBy({ it.artist.lowercase() }, { it.title.lowercase() })
-                )
-                null
-            },
-            onFailure = { exception ->
-                // Clear songs list so we don't show stale data from previous folder
-                _songs.value = emptyList()
-                val errorMsg = exception.message ?: "Failed to load songs"
-                _error.value = errorMsg
-                errorMsg
+        localResult?.fold(
+            onSuccess = { songs -> localSongs = songs },
+            onFailure = { e ->
+                localSongs = emptyList()
+                localError = e.message
+            }
+        ) ?: run {
+            localSongs = emptyList()
+            localError = "No video source configured"
+        }
+
+        // Load YouTube songs
+        youTubeSongLoader.loadSongs().fold(
+            onSuccess = { songs -> youtubeSongs = songs },
+            onFailure = { e ->
+                youtubeSongs = emptyList()
+                youtubeError = e.message
             }
         )
+
+        // Merge songs (local songs take priority if same code)
+        val allSongs = (youtubeSongs + localSongs)
+            .associateBy { it.code }
+            .values
+            .sortedWith(compareBy({ it.artist.lowercase() }, { it.title.lowercase() }))
+
+        _songs.value = allSongs
+
+        // Only return error if both sources failed
+        return if (allSongs.isEmpty()) {
+            val errorMsg = listOfNotNull(localError, youtubeError).joinToString("; ")
+            _error.value = errorMsg
+            errorMsg
+        } else {
+            null
+        }
     }
 }

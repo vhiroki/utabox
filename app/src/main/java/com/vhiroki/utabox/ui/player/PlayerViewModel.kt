@@ -12,9 +12,12 @@ import kotlinx.coroutines.flow.asStateFlow
 data class PlayerUiState(
     val song: Song? = null,
     val videoUri: Uri? = null,
+    val youtubeUrl: String? = null,
     val isLoading: Boolean = true,
     val error: String? = null
-)
+) {
+    val isYouTube: Boolean get() = youtubeUrl != null
+}
 
 class PlayerViewModel(
     private val videoStorageHelper: VideoStorageHelper
@@ -26,6 +29,17 @@ class PlayerViewModel(
     fun loadVideo(song: Song) {
         _uiState.value = PlayerUiState(song = song, isLoading = true)
 
+        // Check if it's a YouTube song
+        if (song.isYouTube) {
+            _uiState.value = PlayerUiState(
+                song = song,
+                youtubeUrl = song.youtubeUrl,
+                isLoading = false
+            )
+            return
+        }
+
+        // Local video file
         val videoUri = videoStorageHelper.getVideoUri(song.code)
 
         if (videoUri != null) {
