@@ -4,6 +4,7 @@ import com.vhiroki.utabox.util.VideoStorageHelper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import java.text.Normalizer
 
 class SongRepository(
     private val csvSongReader: CsvSongReader,
@@ -25,12 +26,12 @@ class SongRepository(
         return if (query.isBlank()) {
             _songs
         } else {
-            val trimmedQuery = query.trim().lowercase()
+            val trimmedQuery = query.trim().lowercase().removeDiacritics()
             _songs.map { songs ->
                 songs.filter { song ->
                     song.code.lowercase().startsWith(trimmedQuery) ||
-                    song.title.lowercase().contains(trimmedQuery) ||
-                    song.artist.lowercase().contains(trimmedQuery)
+                    song.title.lowercase().removeDiacritics().contains(trimmedQuery) ||
+                    song.artist.lowercase().removeDiacritics().contains(trimmedQuery)
                 }.sortedWith(
                     compareBy(
                         { !it.code.lowercase().startsWith(trimmedQuery) },
@@ -40,6 +41,15 @@ class SongRepository(
                 )
             }
         }
+    }
+
+    /**
+     * Removes diacritics (accents) from a string for accent-insensitive comparison.
+     * For example: "pão" becomes "pao", "café" becomes "cafe"
+     */
+    private fun String.removeDiacritics(): String {
+        val normalized = Normalizer.normalize(this, Normalizer.Form.NFD)
+        return normalized.replace(Regex("\\p{InCombiningDiacriticalMarks}+"), "")
     }
 
     /**
