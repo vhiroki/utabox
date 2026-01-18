@@ -205,16 +205,6 @@ private fun SongCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                if (song.inicio.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "♪ ${song.inicio}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
             }
         }
     }
