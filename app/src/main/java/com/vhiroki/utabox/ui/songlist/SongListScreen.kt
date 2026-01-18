@@ -270,6 +270,34 @@ private fun SongCard(
                     }
                 }
             }
+
+            // Videokê indicator for local songs
+            if (song.isLocal) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Surface(
+                    color = Color(0xFF6200EE),
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Videokê",
+                            tint = Color.White,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Videokê",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -163,7 +163,8 @@ class CsvSongReader(private val context: Context) {
             code = code,
             filename = filename,
             artist = artist,
-            title = title
+            title = title,
+            isLocal = true
         )
     }
 }

@@ -8,7 +8,8 @@ data class Song(
     val artist: String,
     val title: String,
     val youtubeUrl: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val isLocal: Boolean = false
 ) {
     val isYouTube: Boolean get() = youtubeUrl != null
 
