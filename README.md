@@ -74,7 +74,7 @@ youtube-songs/                   # YouTube song catalog (on GitHub)
 The app searches for video files in the following locations (in order):
 
 1. **User-selected folder**: Via Android's document picker (recommended)
-2. **Test folder**: `/sdcard/Download/karaoke/` (for development)
+2. **Test folder**: `/sdcard/Downloads/videoke/` (for development)
 3. **USB drive**: Auto-detects removable storage with a `videoke/` folder
 
 Video files should be named `{code}.mp4` (e.g., `02017.mp4`, `05340.mp4`).

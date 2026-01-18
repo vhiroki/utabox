@@ -2,7 +2,6 @@ package com.vhiroki.utabox
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -18,41 +17,20 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.vhiroki.utabox.ui.navigation.UtaBoxNavHost
 import com.vhiroki.utabox.ui.theme.UtaBoxTheme
-import com.vhiroki.utabox.util.VideoStorageHelper
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var videoStorageHelper: VideoStorageHelper
-
-    // Track permission state to trigger recomposition
-    private val permissionGranted = mutableStateOf(false)
-
-    // Callback to invoke after folder is selected
-    private var onFolderSelectedCallback: (() -> Unit)? = null
-
-    private val folderPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
-    ) { uri: Uri? ->
-        uri?.let {
-            android.util.Log.d("MainActivity", "Selected folder: $it")
-            videoStorageHelper.savePersistedFolderUri(it)
-            // Trigger recomposition to update video source description
-            permissionGranted.value = !permissionGranted.value
-            // Call the callback to reload songs
-            onFolderSelectedCallback?.invoke()
-        }
-    }
+    // Track permission grant to trigger recomposition
+    private val reloadCount = mutableStateOf(0)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        permissionGranted.value = isGranted
+    ) { _ ->
+        reloadCount.value++ // Trigger reload on permission grant
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        videoStorageHelper = VideoStorageHelper(this)
 
         // Request permission on startup
         requestMediaPermission()
@@ -64,18 +42,14 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-val navController = rememberNavController()
+                    val navController = rememberNavController()
 
-                    // Read permissionGranted to trigger recomposition when it changes
-                    @Suppress("UNUSED_VARIABLE")
-                    val permissionState = permissionGranted.value
+                    // Read reloadCount to trigger recomposition when permission is granted
+                    val reloadTrigger = reloadCount.value
 
                     UtaBoxNavHost(
                         navController = navController,
-                        onRequestFolderPicker = { onFolderSelected ->
-                            onFolderSelectedCallback = onFolderSelected
-                            folderPickerLauncher.launch(null)
-                        }
+                        reloadTrigger = reloadTrigger
                     )
                 }
             }
@@ -91,7 +65,7 @@ val navController = rememberNavController()
 
         when {
             ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
-                permissionGranted.value = true
+                // Already have permission, no action needed
             }
             else -> {
                 permissionLauncher.launch(permission)

@@ -60,7 +60,7 @@ object Routes {
 @Composable
 fun UtaBoxNavHost(
     navController: NavHostController,
-    onRequestFolderPicker: (onFolderSelected: () -> Unit) -> Unit
+    reloadTrigger: Int = 0
 ) {
     val context = LocalContext.current
 
@@ -79,26 +79,24 @@ fun UtaBoxNavHost(
                 factory = SongListViewModel.Factory(repository)
             )
 
-            // Recompute on each recomposition
+            // Get video source description
             val videoSourceDescription = remember {
                 androidx.compose.runtime.mutableStateOf(videoStorageHelper.getVideoSourceDescription())
             }
-            // Update when screen is shown
-            androidx.compose.runtime.LaunchedEffect(Unit) {
-                videoSourceDescription.value = videoStorageHelper.getVideoSourceDescription()
+
+            // Reload songs when reloadTrigger changes (folder selected or permission granted)
+            androidx.compose.runtime.LaunchedEffect(reloadTrigger) {
+                if (reloadTrigger > 0) {
+                    android.util.Log.d("Navigation", "Reload triggered: $reloadTrigger")
+                    viewModel.reload()
+                    videoSourceDescription.value = videoStorageHelper.getVideoSourceDescription()
+                }
             }
 
             SongListScreen(
                 viewModel = viewModel,
                 onSongClick = { song ->
                     navController.navigate(Routes.playerRoute(song))
-                },
-                onSelectFolder = {
-                    onRequestFolderPicker {
-                        // Called after folder is selected - reload songs and update description
-                        viewModel.reload()
-                        videoSourceDescription.value = videoStorageHelper.getVideoSourceDescription()
-                    }
                 },
                 videoSourceDescription = videoSourceDescription.value
             )

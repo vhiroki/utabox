@@ -45,17 +45,45 @@ class CsvSongReader(private val context: Context) {
 
     /**
      * Read all songs from CSV files using DocumentFile (for SAF/persisted folders).
+     * Expects the folder to be or contain a "videoke" folder with CSV files.
      * @param folderUri The URI of the folder
      * @return List of songs, with duplicates resolved by last occurrence
      */
     fun readFromDocumentFolder(folderUri: Uri): Result<List<Song>> {
         return try {
-            val documentFile = DocumentFile.fromTreeUri(context, folderUri)
-                ?: return Result.failure(Exception("Cannot access folder"))
+            android.util.Log.d("CsvSongReader", "Reading from folder: $folderUri")
 
-            val csvFiles = documentFile.listFiles().filter {
+            val documentFile = try {
+                DocumentFile.fromTreeUri(context, folderUri)
+            } catch (e: Exception) {
+                android.util.Log.e("CsvSongReader", "Failed to create DocumentFile from URI", e)
+                return Result.failure(Exception("Cannot access folder: ${e.message}"))
+            }
+
+            if (documentFile == null) {
+                android.util.Log.e("CsvSongReader", "DocumentFile is null for URI: $folderUri")
+                return Result.failure(Exception("Cannot access folder"))
+            }
+
+            android.util.Log.d("CsvSongReader", "DocumentFile created, listing files...")
+
+            // First, try to find a "videoke" subfolder
+            val targetFolder = documentFile.findFile("videoke") ?: documentFile
+
+            val allFiles = try {
+                targetFolder.listFiles()
+            } catch (e: Exception) {
+                android.util.Log.e("CsvSongReader", "Failed to list files in folder", e)
+                return Result.failure(Exception("Cannot list files in folder: ${e.message}"))
+            }
+
+            android.util.Log.d("CsvSongReader", "Found ${allFiles.size} files in folder")
+
+            val csvFiles = allFiles.filter {
                 it.name?.endsWith(".csv", ignoreCase = true) == true
             }
+
+            android.util.Log.d("CsvSongReader", "Found ${csvFiles.size} CSV files")
 
             if (csvFiles.isEmpty()) {
                 return Result.failure(Exception("No CSV files found in selected folder"))
@@ -64,14 +92,22 @@ class CsvSongReader(private val context: Context) {
             val songsMap = mutableMapOf<String, Song>()
 
             for (csvDoc in csvFiles) {
-                csvDoc.uri.let { uri ->
-                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                            parseCsv(reader, songsMap)
+                try {
+                    android.util.Log.d("CsvSongReader", "Reading CSV: ${csvDoc.name}")
+                    csvDoc.uri.let { uri ->
+                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                            BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                                parseCsv(reader, songsMap)
+                            }
                         }
                     }
+                } catch (e: Exception) {
+                    android.util.Log.e("CsvSongReader", "Error reading CSV ${csvDoc.name}: ${e.message}", e)
+                    // Continue with other files
                 }
             }
+
+            android.util.Log.d("CsvSongReader", "Loaded ${songsMap.size} songs from CSV files")
 
             if (songsMap.isEmpty()) {
                 Result.failure(Exception("No songs found in CSV files"))
@@ -79,6 +115,7 @@ class CsvSongReader(private val context: Context) {
                 Result.success(songsMap.values.toList())
             }
         } catch (e: Exception) {
+            android.util.Log.e("CsvSongReader", "Unexpected error reading folder: ${e.message}", e)
             Result.failure(e)
         }
     }

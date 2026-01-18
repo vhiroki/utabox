@@ -11,7 +11,6 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +29,6 @@ import com.vhiroki.utabox.data.Song
 fun SongListScreen(
     viewModel: SongListViewModel,
     onSongClick: (Song) -> Unit,
-    onSelectFolder: () -> Unit,
     videoSourceDescription: String,
     modifier: Modifier = Modifier
 ) {
@@ -64,13 +62,6 @@ fun SongListScreen(
                     titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
                 ),
                 actions = {
-                    IconButton(onClick = onSelectFolder) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "Select folder",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
                     IconButton(onClick = { viewModel.reload() }) {
                         Icon(
                             Icons.Default.Refresh,
