@@ -73,6 +73,31 @@ Video files should be named `{music_id}.mp4` (e.g., `02017.mp4`, `05340.mp4`).
 
 ### Building
 
+The project includes a convenient build script for generating APKs.
+
+#### Using the Build Script (Recommended)
+
+```bash
+# Build debug APK
+./build-apk.sh
+
+# Clean build (removes previous artifacts first)
+./build-apk.sh --clean
+
+# Build and install on connected device
+./build-apk.sh --install
+
+# Clean build and install
+./build-apk.sh --clean --install
+
+# Show all options
+./build-apk.sh --help
+```
+
+The APK will be generated at: `app/build/outputs/apk/debug/app-debug.apk`
+
+#### Using Gradle Directly
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/UtaBox.git
