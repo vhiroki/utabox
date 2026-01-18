@@ -86,11 +86,7 @@ git clone https://github.com/yourusername/UtaBox.git
 
 ### Database
 
-The app comes with a pre-populated SQLite database containing ~1,550 songs. To regenerate from CSV:
-
-```bash
-python3 scripts/generate_songs_db.py
-```
+The app comes with a pre-populated SQLite database containing ~1,550 songs.
 
 ## Usage
 
