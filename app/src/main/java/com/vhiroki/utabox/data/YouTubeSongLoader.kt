@@ -12,8 +12,11 @@ import java.net.URL
 class YouTubeSongLoader {
 
     companion object {
-        private const val GITHUB_API_BASE = "https://api.github.com/repos/vhiroki/utabox/contents/youtube-songs"
         private const val GITHUB_RAW_BASE = "https://raw.githubusercontent.com/vhiroki/utabox/main/youtube-songs"
+        private const val GITHUB_API_BASE = "https://api.github.com/repos/vhiroki/utabox/contents/youtube-songs"
+
+        // Index file that lists all CSV files - avoids GitHub API rate limits
+        private const val INDEX_FILE = "index.txt"
     }
 
     /**
@@ -22,11 +25,13 @@ class YouTubeSongLoader {
      */
     suspend fun loadSongs(): Result<List<Song>> = withContext(Dispatchers.IO) {
         try {
-            // Get list of CSV files from GitHub API
-            val csvFiles = fetchCsvFileList()
+            // Get list of CSV files - try index file first, then fallback to GitHub API
+            val csvFiles = fetchCsvFileListFromIndex() ?: fetchCsvFileListFromApi()
+
+            android.util.Log.d("YouTubeSongLoader", "Loading CSV files: $csvFiles")
 
             if (csvFiles.isEmpty()) {
-                return@withContext Result.failure(Exception("No CSV files found in YouTube songs repository"))
+                return@withContext Result.failure(Exception("No CSV files found"))
             }
 
             val songsMap = mutableMapOf<String, Song>()
@@ -34,8 +39,10 @@ class YouTubeSongLoader {
             // Fetch and parse each CSV file
             for (filename in csvFiles) {
                 try {
+                    android.util.Log.d("YouTubeSongLoader", "Fetching: $filename")
                     val csvContent = fetchFileContent(filename)
                     parseCsv(csvContent, songsMap)
+                    android.util.Log.d("YouTubeSongLoader", "Loaded ${songsMap.size} songs so far")
                 } catch (e: Exception) {
                     // Log but continue with other files
                     android.util.Log.e("YouTubeSongLoader", "Failed to load $filename: ${e.message}")
@@ -45,37 +52,72 @@ class YouTubeSongLoader {
             if (songsMap.isEmpty()) {
                 Result.failure(Exception("No YouTube songs found"))
             } else {
+                android.util.Log.d("YouTubeSongLoader", "Total YouTube songs loaded: ${songsMap.size}")
                 Result.success(songsMap.values.toList())
             }
         } catch (e: Exception) {
+            android.util.Log.e("YouTubeSongLoader", "Error loading songs: ${e.message}")
             Result.failure(e)
         }
     }
 
     /**
-     * Fetch list of CSV files from GitHub repository.
+     * Try to fetch list of CSV files from index.txt file.
+     * Returns null if index file doesn't exist or can't be read.
      */
-    private fun fetchCsvFileList(): List<String> {
-        val url = URL(GITHUB_API_BASE)
-        val connection = url.openConnection() as HttpURLConnection
-        connection.requestMethod = "GET"
-        connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
-        connection.connectTimeout = 10000
-        connection.readTimeout = 10000
-
+    private fun fetchCsvFileListFromIndex(): List<String>? {
         return try {
+            val url = URL("$GITHUB_RAW_BASE/$INDEX_FILE")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+
+            if (connection.responseCode == HttpURLConnection.HTTP_OK) {
+                val content = connection.inputStream.bufferedReader().readText()
+                connection.disconnect()
+                val files = content.lines()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() && it.endsWith(".csv") }
+                if (files.isNotEmpty()) files else null
+            } else {
+                connection.disconnect()
+                android.util.Log.d("YouTubeSongLoader", "Index file not found, falling back to API")
+                null
+            }
+        } catch (e: Exception) {
+            android.util.Log.d("YouTubeSongLoader", "Could not fetch index file: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Fetch list of CSV files from GitHub API (fallback, may be rate limited).
+     */
+    private fun fetchCsvFileListFromApi(): List<String> {
+        return try {
+            val url = URL(GITHUB_API_BASE)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.setRequestProperty("Accept", "application/vnd.github.v3+json")
+            connection.connectTimeout = 10000
+            connection.readTimeout = 10000
+
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val response = connection.inputStream.bufferedReader().readText()
+                connection.disconnect()
                 // Parse JSON response to extract .csv filenames
                 // Simple regex parsing to avoid adding JSON library dependency
                 val pattern = """"name"\s*:\s*"([^"]+\.csv)"""".toRegex()
                 pattern.findAll(response).map { it.groupValues[1] }.toList()
             } else {
                 android.util.Log.e("YouTubeSongLoader", "GitHub API error: ${connection.responseCode}")
+                connection.disconnect()
                 emptyList()
             }
-        } finally {
-            connection.disconnect()
+        } catch (e: Exception) {
+            android.util.Log.e("YouTubeSongLoader", "GitHub API request failed: ${e.message}")
+            emptyList()
         }
     }
 
