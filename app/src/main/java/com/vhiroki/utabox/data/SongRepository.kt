@@ -13,6 +13,7 @@ class SongRepository(
 ) {
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     private val _error = MutableStateFlow<String?>(null)
+    private val _lookupReport = MutableStateFlow<LookupReport?>(null)
 
     // Store local and YouTube songs separately so we can merge them
     private var localSongs: List<Song> = emptyList()
@@ -24,6 +25,7 @@ class SongRepository(
     }
 
     val error: Flow<String?> = _error
+    val lookupReport: Flow<LookupReport?> = _lookupReport
 
     fun getAllSongs(): Flow<List<Song>> = _songs
 
@@ -67,13 +69,13 @@ class SongRepository(
 
     /**
      * Load or reload songs from both local CSV files and YouTube repository.
-     * Returns error message if both sources fail, null on success.
+     * Returns LookupReport with details about each source.
      */
-    suspend fun reload(): String? {
+    suspend fun reload(): LookupReport {
         _error.value = null
 
-        var localError: String? = null
-        var youtubeError: String? = null
+        var localSourceReport: SourceReport? = null
+        var youtubeSourceReport: SourceReport? = null
 
         // Load local songs
         val localResult = videoStorageHelper.getPersistedTreeUri()?.let { uri ->
@@ -83,22 +85,56 @@ class SongRepository(
         }
 
         localResult?.fold(
-            onSuccess = { songs -> localSongs = songs },
+            onSuccess = { result ->
+                localSongs = result.songs
+                localSourceReport = SourceReport(
+                    sourceName = "USB/Local Storage",
+                    folderPath = result.directoryPath,
+                    csvFiles = result.csvFileReports,
+                    songCount = result.songs.size
+                )
+            },
             onFailure = { e ->
                 localSongs = emptyList()
-                localError = e.message
+                localSourceReport = SourceReport(
+                    sourceName = "USB/Local Storage",
+                    folderPath = videoStorageHelper.getVideoSourceDirectory()?.absolutePath,
+                    csvFiles = emptyList(),
+                    songCount = 0,
+                    error = e.message
+                )
             }
         ) ?: run {
             localSongs = emptyList()
-            localError = "No video source configured"
+            localSourceReport = SourceReport(
+                sourceName = "USB/Local Storage",
+                folderPath = null,
+                csvFiles = emptyList(),
+                songCount = 0,
+                error = "No USB drive with 'videoke' folder detected"
+            )
         }
 
         // Load YouTube songs
         youTubeSongLoader.loadSongs().fold(
-            onSuccess = { songs -> youtubeSongs = songs },
+            onSuccess = { result ->
+                youtubeSongs = result.songs
+                youtubeSourceReport = SourceReport(
+                    sourceName = "YouTube",
+                    folderPath = result.sourcePath,
+                    csvFiles = result.csvFileReports,
+                    songCount = result.songs.size
+                )
+            },
             onFailure = { e ->
                 youtubeSongs = emptyList()
-                youtubeError = e.message
+                youtubeSourceReport = SourceReport(
+                    sourceName = "YouTube",
+                    folderPath = null,
+                    csvFiles = emptyList(),
+                    songCount = 0,
+                    error = e.message
+                )
             }
         )
 
@@ -110,13 +146,22 @@ class SongRepository(
 
         _songs.value = allSongs
 
-        // Only return error if both sources failed
-        return if (allSongs.isEmpty()) {
-            val errorMsg = listOfNotNull(localError, youtubeError).joinToString("; ")
+        // Build lookup report
+        val report = LookupReport(
+            localReport = localSourceReport,
+            youtubeReport = youtubeSourceReport
+        )
+        _lookupReport.value = report
+
+        // Set error if both sources failed
+        if (allSongs.isEmpty()) {
+            val errorMsg = listOfNotNull(
+                localSourceReport?.error,
+                youtubeSourceReport?.error
+            ).joinToString("; ")
             _error.value = errorMsg
-            errorMsg
-        } else {
-            null
         }
+
+        return report
     }
 }

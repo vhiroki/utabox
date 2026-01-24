@@ -1,9 +1,13 @@
 package com.vhiroki.utabox
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -29,11 +33,18 @@ class MainActivity : ComponentActivity() {
         reloadCount.value++ // Trigger reload on permission grant
     }
 
+    // Launcher for "All Files Access" settings screen (Android 11+)
+    private val manageStorageLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        reloadCount.value++ // Trigger reload when returning from settings
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // Request permission on startup
-        requestMediaPermission()
+        requestStoragePermission()
 
         enableEdgeToEdge()
         setContent {
@@ -56,19 +67,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestMediaPermission() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_VIDEO
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-
+    private fun requestStoragePermission() {
         when {
-            ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED -> {
-                // Already have permission, no action needed
+            // Android 11+ (API 30+): Need MANAGE_EXTERNAL_STORAGE for full access
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R -> {
+                if (!Environment.isExternalStorageManager()) {
+                    // Open system settings for "All Files Access"
+                    val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                        data = Uri.parse("package:$packageName")
+                    }
+                    manageStorageLauncher.launch(intent)
+                }
             }
+            // Android 10 and below: Use traditional permissions
             else -> {
-                permissionLauncher.launch(permission)
+                val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    Manifest.permission.READ_MEDIA_VIDEO
+                } else {
+                    Manifest.permission.READ_EXTERNAL_STORAGE
+                }
+
+                if (ContextCompat.checkSelfPermission(this, permission) != PackageManager.PERMISSION_GRANTED) {
+                    permissionLauncher.launch(permission)
+                }
             }
         }
     }

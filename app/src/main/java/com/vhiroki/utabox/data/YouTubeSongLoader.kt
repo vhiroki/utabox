@@ -6,6 +6,15 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
+ * Result of loading YouTube songs, including detailed reports.
+ */
+data class YouTubeLoadResult(
+    val songs: List<Song>,
+    val csvFileReports: List<CsvFileReport>,
+    val sourcePath: String
+)
+
+/**
  * Loads YouTube karaoke songs from CSV files hosted on GitHub.
  * Repository: https://github.com/vhiroki/utabox/tree/main/youtube-songs
  */
@@ -21,39 +30,39 @@ class YouTubeSongLoader {
 
     /**
      * Fetch all YouTube songs from all CSV files in the repository.
-     * @return Result with list of songs, or failure with error message
+     * @return Result with YouTubeLoadResult including songs and file reports, or failure with error message
      */
-    suspend fun loadSongs(): Result<List<Song>> = withContext(Dispatchers.IO) {
+    suspend fun loadSongs(): Result<YouTubeLoadResult> = withContext(Dispatchers.IO) {
         try {
             // Get list of CSV files - try index file first, then fallback to GitHub API
             val csvFiles = fetchCsvFileListFromIndex() ?: fetchCsvFileListFromApi()
-
-            android.util.Log.d("YouTubeSongLoader", "Loading CSV files: $csvFiles")
 
             if (csvFiles.isEmpty()) {
                 return@withContext Result.failure(Exception("No CSV files found"))
             }
 
             val songsMap = mutableMapOf<String, Song>()
+            val fileReports = mutableListOf<CsvFileReport>()
 
             // Fetch and parse each CSV file
             for (filename in csvFiles) {
                 try {
-                    android.util.Log.d("YouTubeSongLoader", "Fetching: $filename")
+                    val beforeCount = songsMap.size
                     val csvContent = fetchFileContent(filename)
                     parseCsv(csvContent, songsMap)
-                    android.util.Log.d("YouTubeSongLoader", "Loaded ${songsMap.size} songs so far")
+                    val songsFromFile = songsMap.size - beforeCount
+                    fileReports.add(CsvFileReport(filename, songsFromFile))
                 } catch (e: Exception) {
                     // Log but continue with other files
                     android.util.Log.e("YouTubeSongLoader", "Failed to load $filename: ${e.message}")
+                    fileReports.add(CsvFileReport(filename, 0, e.message))
                 }
             }
 
             if (songsMap.isEmpty()) {
                 Result.failure(Exception("No YouTube songs found"))
             } else {
-                android.util.Log.d("YouTubeSongLoader", "Total YouTube songs loaded: ${songsMap.size}")
-                Result.success(songsMap.values.toList())
+                Result.success(YouTubeLoadResult(songsMap.values.toList(), fileReports, GITHUB_RAW_BASE))
             }
         } catch (e: Exception) {
             android.util.Log.e("YouTubeSongLoader", "Error loading songs: ${e.message}")
@@ -70,8 +79,8 @@ class YouTubeSongLoader {
             val url = URL("$GITHUB_RAW_BASE/$INDEX_FILE")
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
-            connection.connectTimeout = 10000
-            connection.readTimeout = 10000
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
 
             if (connection.responseCode == HttpURLConnection.HTTP_OK) {
                 val content = connection.inputStream.bufferedReader().readText()
@@ -82,11 +91,9 @@ class YouTubeSongLoader {
                 if (files.isNotEmpty()) files else null
             } else {
                 connection.disconnect()
-                android.util.Log.d("YouTubeSongLoader", "Index file not found, falling back to API")
                 null
             }
         } catch (e: Exception) {
-            android.util.Log.d("YouTubeSongLoader", "Could not fetch index file: ${e.message}")
             null
         }
     }
@@ -149,6 +156,10 @@ class YouTubeSongLoader {
      */
     private fun parseCsv(content: String, songsMap: MutableMap<String, Song>) {
         val lines = content.lines()
+        android.util.Log.d("YouTubeSongLoader", "Parsing CSV with ${lines.size} lines")
+
+        var parsedCount = 0
+        var skippedCount = 0
 
         for ((index, line) in lines.withIndex()) {
             // Skip header line
@@ -158,8 +169,15 @@ class YouTubeSongLoader {
             val song = parseCsvLine(line)
             if (song != null) {
                 songsMap[song.code] = song
+                parsedCount++
+            } else {
+                skippedCount++
+                if (skippedCount <= 3) {
+                    android.util.Log.d("YouTubeSongLoader", "Failed to parse line $index: ${line.take(100)}")
+                }
             }
         }
+        android.util.Log.d("YouTubeSongLoader", "Parsed $parsedCount songs, skipped $skippedCount lines")
     }
 
     /**

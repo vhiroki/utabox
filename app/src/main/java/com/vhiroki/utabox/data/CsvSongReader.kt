@@ -8,6 +8,15 @@ import java.io.File
 import java.io.InputStreamReader
 
 /**
+ * Result of reading songs from CSV files, including detailed reports.
+ */
+data class CsvReadResult(
+    val songs: List<Song>,
+    val csvFileReports: List<CsvFileReport>,
+    val directoryPath: String
+)
+
+/**
  * Reads songs from CSV files in the video source directory.
  * CSV format: code,filename,artist,title,lyrics_preview
  * If duplicate codes exist across files, the last occurrence wins.
@@ -17,26 +26,34 @@ class CsvSongReader(private val context: Context) {
     /**
      * Read all songs from CSV files in the given directory.
      * @param directory File directory (for test folder or USB)
-     * @return List of songs, with duplicates resolved by last occurrence
+     * @return CsvReadResult with songs and per-file reports
      */
-    fun readFromDirectory(directory: File): Result<List<Song>> {
+    fun readFromDirectory(directory: File): Result<CsvReadResult> {
         return try {
             val songsMap = mutableMapOf<String, Song>()
+            val fileReports = mutableListOf<CsvFileReport>()
 
             val csvFiles = directory.listFiles { file ->
                 file.extension.equals("csv", ignoreCase = true)
             }?.toList() ?: emptyList()
 
             for (csvFile in csvFiles) {
-                csvFile.bufferedReader().use { reader ->
-                    parseCsv(reader, songsMap)
+                try {
+                    val beforeCount = songsMap.size
+                    csvFile.bufferedReader().use { reader ->
+                        parseCsv(reader, songsMap)
+                    }
+                    val songsFromFile = songsMap.size - beforeCount
+                    fileReports.add(CsvFileReport(csvFile.name, songsFromFile))
+                } catch (e: Exception) {
+                    fileReports.add(CsvFileReport(csvFile.name, 0, e.message))
                 }
             }
 
-            if (songsMap.isEmpty()) {
+            if (csvFiles.isEmpty()) {
                 Result.failure(Exception("No CSV files found in ${directory.absolutePath}"))
             } else {
-                Result.success(songsMap.values.toList())
+                Result.success(CsvReadResult(songsMap.values.toList(), fileReports, directory.absolutePath))
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -47,9 +64,9 @@ class CsvSongReader(private val context: Context) {
      * Read all songs from CSV files using DocumentFile (for SAF/persisted folders).
      * Expects the folder to be or contain a "videoke" folder with CSV files.
      * @param folderUri The URI of the folder
-     * @return List of songs, with duplicates resolved by last occurrence
+     * @return CsvReadResult with songs and per-file reports
      */
-    fun readFromDocumentFolder(folderUri: Uri): Result<List<Song>> {
+    fun readFromDocumentFolder(folderUri: Uri): Result<CsvReadResult> {
         return try {
             android.util.Log.d("CsvSongReader", "Reading from folder: $folderUri")
 
@@ -69,6 +86,7 @@ class CsvSongReader(private val context: Context) {
 
             // First, try to find a "videoke" subfolder
             val targetFolder = documentFile.findFile("videoke") ?: documentFile
+            val folderPath = targetFolder.uri.path ?: folderUri.toString()
 
             val allFiles = try {
                 targetFolder.listFiles()
@@ -90,10 +108,13 @@ class CsvSongReader(private val context: Context) {
             }
 
             val songsMap = mutableMapOf<String, Song>()
+            val fileReports = mutableListOf<CsvFileReport>()
 
             for (csvDoc in csvFiles) {
+                val filename = csvDoc.name ?: "unknown.csv"
                 try {
-                    android.util.Log.d("CsvSongReader", "Reading CSV: ${csvDoc.name}")
+                    android.util.Log.d("CsvSongReader", "Reading CSV: $filename")
+                    val beforeCount = songsMap.size
                     csvDoc.uri.let { uri ->
                         context.contentResolver.openInputStream(uri)?.use { inputStream ->
                             BufferedReader(InputStreamReader(inputStream)).use { reader ->
@@ -101,9 +122,11 @@ class CsvSongReader(private val context: Context) {
                             }
                         }
                     }
+                    val songsFromFile = songsMap.size - beforeCount
+                    fileReports.add(CsvFileReport(filename, songsFromFile))
                 } catch (e: Exception) {
-                    android.util.Log.e("CsvSongReader", "Error reading CSV ${csvDoc.name}: ${e.message}", e)
-                    // Continue with other files
+                    android.util.Log.e("CsvSongReader", "Error reading CSV $filename: ${e.message}", e)
+                    fileReports.add(CsvFileReport(filename, 0, e.message))
                 }
             }
 
@@ -112,7 +135,7 @@ class CsvSongReader(private val context: Context) {
             if (songsMap.isEmpty()) {
                 Result.failure(Exception("No songs found in CSV files"))
             } else {
-                Result.success(songsMap.values.toList())
+                Result.success(CsvReadResult(songsMap.values.toList(), fileReports, folderPath))
             }
         } catch (e: Exception) {
             android.util.Log.e("CsvSongReader", "Unexpected error reading folder: ${e.message}", e)

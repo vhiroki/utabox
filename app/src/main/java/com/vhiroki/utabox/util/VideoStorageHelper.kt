@@ -64,21 +64,39 @@ class VideoStorageHelper(private val context: Context) {
     // ===== Private methods =====
 
     private fun getUsbVideoFolder(): File? {
-        val storageManager = context.getSystemService<StorageManager>() ?: return null
+        val storageManager = context.getSystemService<StorageManager>() ?: run {
+            android.util.Log.e("VideoStorageHelper", "StorageManager is null")
+            return null
+        }
+
+        android.util.Log.d("VideoStorageHelper", "Found ${storageManager.storageVolumes.size} storage volumes")
 
         for (volume in storageManager.storageVolumes) {
+            val path = getVolumePath(volume)
+            android.util.Log.d("VideoStorageHelper", "Volume: ${volume.getDescription(context)}, isRemovable=${volume.isRemovable}, state=${volume.state}, path=$path")
+
             if (volume.isRemovable && volume.state == Environment.MEDIA_MOUNTED) {
-                val path = getVolumePath(volume) ?: continue
+                if (path == null) {
+                    android.util.Log.w("VideoStorageHelper", "Removable volume has null path")
+                    continue
+                }
 
                 // Check for videoke folder
                 val videokeFolder = File(path, VIDEO_FOLDER_NAME)
+                android.util.Log.d("VideoStorageHelper", "Checking videoke folder: ${videokeFolder.absolutePath}, exists=${videokeFolder.exists()}, isDirectory=${videokeFolder.isDirectory}")
+
                 if (videokeFolder.exists() && videokeFolder.isDirectory) {
+                    val files = videokeFolder.listFiles()
+                    android.util.Log.d("VideoStorageHelper", "videoke folder contents: ${files?.map { it.name } ?: "null (no permission?)"}")
                     return videokeFolder
                 }
 
                 // Also check root of USB for mp4 files
                 val rootFolder = File(path)
-                if (rootFolder.listFiles()?.any { it.extension == "mp4" } == true) {
+                val rootFiles = rootFolder.listFiles()
+                android.util.Log.d("VideoStorageHelper", "Root folder contents: ${rootFiles?.map { it.name } ?: "null (no permission?)"}")
+
+                if (rootFiles?.any { it.extension == "mp4" } == true) {
                     return rootFolder
                 }
             }

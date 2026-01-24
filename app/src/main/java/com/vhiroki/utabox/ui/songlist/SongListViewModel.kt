@@ -3,6 +3,7 @@ package com.vhiroki.utabox.ui.songlist
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.vhiroki.utabox.data.LookupReport
 import com.vhiroki.utabox.data.Song
 import com.vhiroki.utabox.data.SongRepository
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,12 @@ class SongListViewModel(private val repository: SongRepository) : ViewModel() {
 
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _lookupReport = MutableStateFlow<LookupReport?>(null)
+    val lookupReport: StateFlow<LookupReport?> = _lookupReport.asStateFlow()
+
+    private val _showReportDialog = MutableStateFlow(false)
+    val showReportDialog: StateFlow<Boolean> = _showReportDialog.asStateFlow()
 
     val songs: StateFlow<List<Song>> = _searchQuery
         .debounce(300) // Wait for user to stop typing
@@ -51,14 +58,28 @@ class SongListViewModel(private val repository: SongRepository) : ViewModel() {
         viewModelScope.launch(Dispatchers.IO) {
             _isLoading.value = true
             _errorMessage.value = null
-            val error = repository.reload()
-            _errorMessage.value = error
+            val report = repository.reload()
+            _lookupReport.value = report
+            if (!report.isSuccess) {
+                _errorMessage.value = listOfNotNull(
+                    report.localReport?.error,
+                    report.youtubeReport?.error
+                ).joinToString("; ")
+            }
             _isLoading.value = false
         }
     }
 
     fun clearError() {
         _errorMessage.value = null
+    }
+
+    fun showReport() {
+        _showReportDialog.value = true
+    }
+
+    fun dismissReport() {
+        _showReportDialog.value = false
     }
 
     class Factory(private val repository: SongRepository) : ViewModelProvider.Factory {
